@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>도장 라인 CAPA · 품질수율 분석 대시보드</title>
+<style>
+  :root{
+    --bg:#0f1419; --panel:#1a2129; --panel2:#222b35; --line:#2e3a46;
+    --txt:#e6edf3; --muted:#9fb0c0; --accent:#4a90e2; --good:#37b24d;
+    --warn:#f59f00; --bad:#e03131; --yellow:#ffe066; --red:#ff6b6b;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);
+    font-family:"Segoe UI",-apple-system,"Malgun Gothic","Apple SD Gothic Neo",sans-serif;
+    font-size:14px;line-height:1.5;}
+  header{padding:18px 24px;border-bottom:1px solid var(--line);
+    background:linear-gradient(180deg,#16202b,#0f1419);}
+  header h1{margin:0;font-size:20px;font-weight:700;}
+  header p{margin:4px 0 0;color:var(--muted);font-size:13px;}
+  .wrap{max-width:1320px;margin:0 auto;padding:20px 24px 60px;}
+  .grid{display:grid;gap:18px;}
+  .cols-2{grid-template-columns:380px 1fr;}
+  @media(max-width:980px){.cols-2{grid-template-columns:1fr;}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;}
+  .card h2{margin:0 0 14px;font-size:15px;font-weight:700;display:flex;align-items:center;gap:8px;}
+  .card h2 .dot{width:8px;height:8px;border-radius:50%;background:var(--accent);}
+  /* sliders */
+  .slider{margin-bottom:16px;}
+  .slider .row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;}
+  .slider label{font-size:13px;color:var(--muted);}
+  .slider .val{font-weight:700;font-size:15px;color:var(--txt);}
+  .slider .val small{color:var(--muted);font-weight:400;font-size:11px;margin-left:2px;}
+  input[type=range]{width:100%;-webkit-appearance:none;height:6px;border-radius:4px;
+    background:var(--panel2);outline:none;}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;
+    border-radius:50%;background:var(--accent);cursor:pointer;border:3px solid #0f1419;}
+  input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;
+    background:var(--accent);cursor:pointer;border:3px solid #0f1419;}
+  .reset{background:var(--panel2);color:var(--txt);border:1px solid var(--line);
+    border-radius:8px;padding:8px 14px;cursor:pointer;font-size:13px;width:100%;margin-top:4px;}
+  .reset:hover{background:#2c3744;}
+  /* KPI */
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
+  @media(max-width:760px){.kpis{grid-template-columns:repeat(2,1fr);}}
+  .kpi{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:14px;}
+  .kpi .k{font-size:12px;color:var(--muted);margin-bottom:6px;}
+  .kpi .v{font-size:26px;font-weight:800;letter-spacing:-.5px;}
+  .kpi .s{font-size:11px;color:var(--muted);margin-top:4px;}
+  .v.good{color:var(--good)} .v.warn{color:var(--warn)} .v.bad{color:var(--bad)}
+  /* flow */
+  .flow{display:flex;flex-direction:column;gap:8px;}
+  .bar{height:30px;border-radius:6px;display:flex;align-items:center;padding:0 10px;
+    font-size:12px;font-weight:600;color:#0f1419;white-space:nowrap;overflow:hidden;transition:width .25s;}
+  .bar.direct{background:var(--good)} .bar.repair{background:#74c0fc;color:#0f1419}
+  .bar.repaint{background:var(--yellow)} .bar.scrap{background:var(--red);color:#fff}
+  .bar.wip{background:repeating-linear-gradient(45deg,#f59f00,#f59f00 6px,#d9870a 6px,#d9870a 12px);color:#0f1419}
+  .flowrow{display:flex;align-items:center;gap:10px;}
+  .flowrow .lbl{width:120px;font-size:12px;color:var(--muted);flex-shrink:0;}
+  .flowtrack{flex:1;background:var(--panel2);border-radius:6px;overflow:hidden;}
+  /* table */
+  table{width:100%;border-collapse:collapse;font-size:12.5px;}
+  th,td{padding:6px 8px;text-align:right;border-bottom:1px solid var(--line);}
+  th{color:var(--muted);font-weight:600;text-align:right;position:sticky;top:0;background:var(--panel);}
+  td.name,th.name{text-align:left;}
+  tr.off td{color:#5d6b78;}
+  td.hr{font-weight:700;}
+  td.hr.red{color:var(--red);}
+  td.hr.yellow{color:var(--yellow);}
+  tr.total td{font-weight:800;border-top:2px solid var(--line);border-bottom:none;background:var(--panel2);}
+  .tablewrap{max-height:520px;overflow:auto;border-radius:8px;}
+  .badge{display:inline-block;padding:1px 7px;border-radius:10px;font-size:11px;font-weight:700;}
+  .badge.on{background:rgba(55,178,77,.18);color:var(--good);}
+  .badge.off{background:rgba(120,135,150,.18);color:var(--muted);}
+  .note{font-size:12px;color:var(--muted);margin-top:10px;line-height:1.7;}
+  .formula{background:#11181f;border:1px solid var(--line);border-radius:8px;padding:10px 12px;
+    font-family:"Consolas",monospace;font-size:12.5px;color:#bcd;margin:8px 0;}
+  .loadbar{height:34px;border-radius:8px;background:var(--panel2);overflow:hidden;position:relative;margin-top:6px;}
+  .loadfill{height:100%;transition:width .3s,background .3s;}
+  .loadbar .cap{position:absolute;top:0;bottom:0;left:100%;width:2px;background:#fff;opacity:.6;}
+  .loadtxt{position:absolute;top:50%;left:12px;transform:translateY(-50%);font-weight:800;font-size:14px;}
+  .pill{display:inline-flex;gap:6px;align-items:center;font-size:12px;color:var(--muted);margin-right:14px;}
+  .pill b{color:var(--txt);}
+  .legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:8px;font-size:11px;color:var(--muted);}
+  .legend i{width:12px;height:12px;border-radius:3px;display:inline-block;margin-right:4px;vertical-align:-1px;}
+  details{margin-top:14px;} summary{cursor:pointer;color:var(--muted);font-size:13px;}
+</style>
+</head>
+<body>
+<header>
+  <h1>🎨 도장 라인 CAPA · 품질수율 분석 대시보드</h1>
+  <p>주요 변수를 슬라이더로 조정하면 양품율 · 라인 부하율 · CAPA · 품질흐름이 실시간으로 갱신됩니다.</p>
+</header>
+
+<div class="wrap">
+
+  <!-- KPI ROW -->
+  <div class="kpis" style="margin-bottom:18px">
+    <div class="kpi"><div class="k">양품율 (직행+리페어소화)</div><div class="v" id="kpiYield">85.0%</div><div class="s" id="kpiYieldSub">= 73.6% + 18.9%×60%</div></div>
+    <div class="kpi"><div class="k">최종 양품률</div><div class="v good" id="kpiFinal">98.2%</div><div class="s">직행+리페어+재도장</div></div>
+    <div class="kpi"><div class="k">라인 부하율 (재도장 가중)</div><div class="v" id="kpiLoad">—</div><div class="s" id="kpiLoadSub">총소요 / 가용시간</div></div>
+    <div class="kpi"><div class="k">리페어 재공(WIP) 갭</div><div class="v warn" id="kpiGap">7.5%p</div><div class="s">양품율 천장과의 차이</div></div>
+  </div>
+
+  <div class="grid cols-2">
+
+    <!-- LEFT: CONTROLS -->
+    <div class="card">
+      <h2><span class="dot"></span>주요 변수 조정</h2>
+
+      <div class="slider">
+        <div class="row"><label>직행률 (First Pass Yield)</label><span class="val"><span id="vDirect">73.6</span>%</span></div>
+        <input type="range" id="sDirect" min="50" max="100" step="0.1" value="73.6">
+      </div>
+      <div class="slider">
+        <div class="row"><label>불량 중 리페어 대상률</label><span class="val"><span id="vRepair">18.9</span>%</span></div>
+        <input type="range" id="sRepair" min="0" max="30" step="0.1" value="18.9">
+      </div>
+      <div class="slider">
+        <div class="row"><label>리페어 소화율 (실제 처리비율)</label><span class="val"><span id="vAbsorb">60</span>%</span></div>
+        <input type="range" id="sAbsorb" min="0" max="100" step="1" value="60">
+      </div>
+      <div class="slider">
+        <div class="row"><label>재도장률 (라인 재투입)</label><span class="val"><span id="vRepaint">5.7</span>%</span></div>
+        <input type="range" id="sRepaint" min="0" max="20" step="0.1" value="5.7">
+      </div>
+      <div class="slider">
+        <div class="row"><label>폐각률 (최종 불량)</label><span class="val"><span id="vScrap">1.8</span>%</span></div>
+        <input type="range" id="sScrap" min="0" max="10" step="0.1" value="1.8">
+      </div>
+
+      <div style="height:1px;background:var(--line);margin:18px 0"></div>
+
+      <div class="slider">
+        <div class="row"><label>UPH (시간당 생산대수)</label><span class="val"><span id="vUph">138</span><small>대/hr</small></span></div>
+        <input type="range" id="sUph" min="80" max="200" step="1" value="138">
+      </div>
+      <div class="slider">
+        <div class="row"><label>가동율</label><span class="val"><span id="vOper">95</span>%</span></div>
+        <input type="range" id="sOper" min="70" max="100" step="1" value="95">
+      </div>
+      <div class="slider">
+        <div class="row"><label>가용 가동시간</label><span class="val"><span id="vHours">18.48</span><small>Hr</small></span></div>
+        <input type="range" id="sHours" min="10" max="20" step="0.01" value="18.48">
+      </div>
+      <div class="slider">
+        <div class="row"><label>투입량 배율 (전 품목 일괄)</label><span class="val"><span id="vScale">100</span>%</span></div>
+        <input type="range" id="sScale" min="50" max="150" step="1" value="100">
+      </div>
+
+      <button class="reset" id="reset">↺ 초기값으로 리셋</button>
+
+      <details>
+        <summary>설비 파라미터 (고정값)</summary>
+        <div class="note">
+          컨베이어 속도 4.08 · 행거 2.00 · 행거피치 2.86 · 171<br>
+          PRIMER → COLOR → CLEAR (3-Coat) · 20HR 기준
+        </div>
+      </details>
+    </div>
+
+    <!-- RIGHT: OUTPUTS -->
+    <div class="grid" style="gap:18px">
+
+      <!-- Quality flow -->
+      <div class="card">
+        <h2><span class="dot" style="background:var(--good)"></span>품질 흐름 (Quality Flow)</h2>
+        <div class="formula">양품율 = 직행률 + (리페어대상률 × 소화율)</div>
+        <div class="flow" id="flow"></div>
+        <div class="legend">
+          <span><i style="background:var(--good)"></i>직행 양품</span>
+          <span><i style="background:#74c0fc"></i>리페어 회복</span>
+          <span><i style="background:repeating-linear-gradient(45deg,#f59f00,#f59f00 4px,#d9870a 4px,#d9870a 8px)"></i>리페어 미소화(재공)</span>
+          <span><i style="background:var(--yellow)"></i>재도장 회복</span>
+          <span><i style="background:var(--red)"></i>폐각</span>
+        </div>
+        <div class="note" id="flowNote"></div>
+      </div>
+
+      <!-- Line load -->
+      <div class="card">
+        <h2><span class="dot" style="background:var(--warn)"></span>라인 부하율</h2>
+        <div style="display:flex;flex-wrap:wrap;margin-bottom:6px">
+          <span class="pill">총 소요시간 <b id="loadHr">—</b></span>
+          <span class="pill">가용시간 <b id="loadCap">—</b></span>
+          <span class="pill">재도장 가중 <b id="loadRework">—</b></span>
+        </div>
+        <div class="loadbar"><div class="loadfill" id="loadFill"></div><div class="cap"></div><div class="loadtxt" id="loadPct">—</div></div>
+        <div class="note">흰 선 = 가용능력(100%). 막대가 선을 넘으면 <b style="color:var(--bad)">능력 초과</b>. 재도장은 라인을 한 번 더 타므로 부하에 가중됩니다.</div>
+      </div>
+
+      <!-- Hourly balance -->
+      <div class="card">
+        <h2><span class="dot" style="background:#74c0fc"></span>시간당 물량 균형 (리페어 병목 진단)</h2>
+        <div class="kpis" style="grid-template-columns:repeat(3,1fr)">
+          <div class="kpi"><div class="k">불량 발생</div><div class="v" id="hDefect" style="font-size:22px">—</div><div class="s">대/hr</div></div>
+          <div class="kpi"><div class="k">리페어 처리필요</div><div class="v" id="hRepair" style="font-size:22px">—</div><div class="s">대/hr (균형점)</div></div>
+          <div class="kpi"><div class="k">재공 누적속도</div><div class="v" id="hBacklog" style="font-size:22px">—</div><div class="s">대/hr</div></div>
+        </div>
+        <div class="note" id="balNote"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ITEM TABLE -->
+  <div class="card" style="margin-top:18px">
+    <h2><span class="dot"></span>품목별 도장 부하표 (투입 항목 기준)</h2>
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr>
+            <th class="name">ITEM</th>
+            <th>적재</th><th>계획</th><th>생산</th><th>차이</th><th>비율</th>
+            <th>UPH</th><th>소요 Hr</th><th>환산</th><th>투입</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+        <tfoot id="tfoot"></tfoot>
+      </table>
+    </div>
+    <div class="note">
+      소요 Hr = 생산수량 ÷ UPH. <span style="color:var(--red)">빨강</span> = 고부하 주의 품목,
+      <span style="color:var(--yellow)">노랑</span> = 개선안 신규/변경 품목.
+      비율 0% 품목(LWR · RR UPR 등)은 이번 시나리오 미투입.
+    </div>
+  </div>
+
+  <div class="note" style="text-align:center;margin-top:24px">
+    원본 표(개선 전 부하 106% → 개선 후 76.8%) 및 품질수율(직행 73.6% · 리페어 18.9% · 재도장 5.7% · 폐각 1.8%) 데이터를 반영.
+  </div>
+</div>
+
+<script>
+// ---------- 원본 표 품목 데이터 (개선 전 / on=투입) ----------
+const ITEMS = [
+  {name:"NQ5 PE FR STD",        load:"10/10", plan:709, prod:709, on:true},
+  {name:"NQ5 PE FR X-LINE",     load:"10/10", plan:216, prod:216, on:true},
+  {name:"NQ5 PE RR L/RH",       load:"10/10", plan:925, prod:817, on:true, flag:"red"},
+  {name:"NQ5 PE RR LWR",        load:"1/1",   plan:925, prod:925, on:false},
+  {name:"AX EV FR",             load:"9/9",   plan:177, prod:177, on:true, flag:"red"},
+  {name:"AX PE FR",             load:"6/6",   plan:55,  prod:55,  on:true, flag:"red"},
+  {name:"AX EV RR L/RH",        load:"1/6",   plan:193, prod:193, on:false},
+  {name:"OV1 FR STD",           load:"11/11", plan:182, prod:182, on:true},
+  {name:"OV1 FR STD LWR",       load:"1/1",   plan:146, prod:146, on:false},
+  {name:"OV1 RR UPR STD",       load:"11/11", plan:182, prod:182, on:false},
+  {name:"OV1 FR GTL",           load:"11/11", plan:124, prod:124, on:true},
+  {name:"OV1 FR GTL LWR",       load:"1/1",   plan:124, prod:124, on:false},
+  {name:"OV1 RR UPR GTL",       load:"11/11", plan:124, prod:124, on:false},
+  {name:"SP3 FR STD",           load:"11/11", plan:302, prod:302, on:true},
+  {name:"SP3 RR STD",           load:"11/11", plan:302, prod:302, on:false},
+  {name:"SP3 FR X-LINE",        load:"11/11", plan:131, prod:131, on:true},
+  {name:"SP3 FR X-LINE LWR",    load:"1/1",   plan:131, prod:131, on:false},
+  {name:"SP3 RR X-LINE",        load:"11/11", plan:131, prod:131, on:false},
+  {name:"NV1 FRT BUMPER",       load:"-",     plan:0,   prod:0,   on:true},
+  {name:"NV1 RR BUMPER",        load:"-",     plan:0,   prod:0,   on:false},
+];
+
+const DEFAULTS = {Direct:73.6,Repair:18.9,Absorb:60,Repaint:5.7,Scrap:1.8,Uph:138,Oper:95,Hours:18.48,Scale:100};
+
+const $ = id => document.getElementById(id);
+const ids = ["Direct","Repair","Absorb","Repaint","Scrap","Uph","Oper","Hours","Scale"];
+const fmt = (n,d=1)=> n.toLocaleString('ko-KR',{minimumFractionDigits:d,maximumFractionDigits:d});
+const int = n => Math.round(n).toLocaleString('ko-KR');
+
+function read(){
+  const o={};
+  ids.forEach(k=> o[k]=parseFloat($("s"+k).value));
+  return o;
+}
+
+function render(){
+  const v = read();
+  // sync labels
+  $("vDirect").textContent=fmt(v.Direct,1); $("vRepair").textContent=fmt(v.Repair,1);
+  $("vAbsorb").textContent=v.Absorb; $("vRepaint").textContent=fmt(v.Repaint,1);
+  $("vScrap").textContent=fmt(v.Scrap,1); $("vUph").textContent=v.Uph;
+  $("vOper").textContent=v.Oper; $("vHours").textContent=fmt(v.Hours,2);
+  $("vScale").textContent=v.Scale;
+
+  // ---- yield math ----
+  const repairRecover = v.Repair * v.Absorb/100;       // 실제 살린 리페어분 %p
+  const yieldPct = v.Direct + repairRecover;            // 양품율 (보고 기준)
+  const ceiling  = v.Direct + v.Repair;                // 리페어 완전소화 천장
+  const gap      = ceiling - yieldPct;                 // 재공 갭
+  const finalGood= v.Direct + v.Repair + v.Repaint;    // 최종 양품률
+  const wipUnabs = v.Repair - repairRecover;           // 리페어 미소화 %p
+
+  $("kpiYield").textContent = fmt(yieldPct,1)+"%";
+  $("kpiYieldSub").textContent = `= ${fmt(v.Direct,1)}% + ${fmt(v.Repair,1)}%×${v.Absorb}%`;
+  $("kpiFinal").textContent = fmt(Math.min(finalGood,100),1)+"%";
+  $("kpiGap").textContent = fmt(gap,1)+"%p";
+  $("kpiGap").className = "v " + (gap>5?"warn":gap>10?"bad":"good");
+
+  // ---- quality flow bars ----
+  const flow = $("flow");
+  const segs = [
+    {cls:"direct", lbl:"직행 양품", pct:v.Direct},
+    {cls:"repair", lbl:"리페어 회복", pct:repairRecover},
+    {cls:"wip",    lbl:"리페어 재공", pct:wipUnabs},
+    {cls:"repaint",lbl:"재도장 회복", pct:v.Repaint},
+    {cls:"scrap",  lbl:"폐각", pct:v.Scrap},
+  ];
+  flow.innerHTML = segs.map(s=>`
+    <div class="flowrow">
+      <span class="lbl">${s.lbl}</span>
+      <div class="flowtrack"><div class="bar ${s.cls}" style="width:${Math.max(s.pct,0)}%">${s.pct>=3?fmt(s.pct,1)+"%":""}</div></div>
+    </div>`).join("");
+  $("flowNote").innerHTML =
+    `최종 양품 <b>${fmt(Math.min(finalGood,100),1)}%</b> · 폐각 <b>${fmt(v.Scrap,1)}%</b> · `+
+    `양품율 천장(리페어 완전소화) <b>${fmt(ceiling,1)}%</b> · 현재 재공 갭 <b>${fmt(gap,1)}%p</b>`;
+
+  // ---- item table & load ----
+  const tbody = $("tbody"); tbody.innerHTML="";
+  let totHr=0, totProd=0, totPlan=0;
+  ITEMS.forEach(it=>{
+    const prod = it.on ? Math.round(it.prod * v.Scale/100) : 0;
+    const hr = it.on && prod>0 ? prod / v.Uph : 0;
+    if(it.on){ totHr+=hr; totProd+=prod; }
+    totPlan += Math.round(it.plan * v.Scale/100);
+    const ratio = it.on ? 100 : 0;
+    const diff = it.plan>it.prod ? (it.plan-it.prod) : 0;
+    tbody.insertAdjacentHTML("beforeend", `
+      <tr class="${it.on?'':'off'}">
+        <td class="name">${it.name}</td>
+        <td>${it.load}</td>
+        <td>${it.plan?int(Math.round(it.plan*v.Scale/100)):'-'}</td>
+        <td>${it.on&&prod?int(prod):'-'}</td>
+        <td>${diff?int(Math.round(diff*v.Scale/100)):'-'}</td>
+        <td><span class="badge ${it.on?'on':'off'}">${ratio}%</span></td>
+        <td>${it.on&&prod?v.Uph:'-'}</td>
+        <td class="hr ${it.flag||''}">${hr>0?fmt(hr,2):'-'}</td>
+        <td>${it.on&&prod?int(prod):'0'}</td>
+        <td>${it.on?'투입':'-'}</td>
+      </tr>`);
+  });
+  $("tfoot").innerHTML = `
+    <tr class="total">
+      <td class="name">합계 (투입품목)</td><td></td>
+      <td>${int(totPlan)}</td><td>${int(totProd)}</td><td></td><td>100%</td>
+      <td></td><td class="hr">${fmt(totHr,2)}</td><td>${int(totProd)}</td><td></td>
+    </tr>`;
+
+  // ---- load with repaint weighting ----
+  const reworkFactor = 1 + v.Repaint/100;          // 재도장 라인 재투입 가중
+  const loadHr = totHr * reworkFactor;
+  const loadPct = loadHr / v.Hours * 100;
+  $("loadHr").textContent = fmt(totHr,2)+" Hr";
+  $("loadCap").textContent = fmt(v.Hours,2)+" Hr";
+  $("loadRework").textContent = "×"+fmt(reworkFactor,3)+" → "+fmt(loadHr,2)+" Hr";
+  const fill=$("loadFill");
+  const w = Math.min(loadPct,140);
+  fill.style.width = (w/140*100)+"%";
+  fill.style.background = loadPct>100?"var(--bad)":loadPct>90?"var(--warn)":"var(--good)";
+  $("loadPct").textContent = fmt(loadPct,1)+"%";
+  $("loadPct").style.color = loadPct>100?"#fff":"#0f1419";
+  // place cap line at 100/140
+  document.querySelector(".loadbar .cap").style.left = (100/140*100)+"%";
+  const kl=$("kpiLoad"); kl.textContent=fmt(loadPct,1)+"%";
+  kl.className="v "+(loadPct>100?"bad":loadPct>90?"warn":"good");
+  $("kpiLoadSub").textContent = loadPct>100?"⚠ 능력 초과":"여유 있음";
+
+  // ---- hourly balance ----
+  const defectPerHr = v.Uph * (100-v.Direct)/100;
+  const repairNeedHr = v.Uph * v.Repair/100;
+  const repairDoneHr = repairNeedHr * v.Absorb/100;
+  const backlogHr = repairNeedHr - repairDoneHr;
+  $("hDefect").textContent = fmt(defectPerHr,1);
+  $("hRepair").textContent = fmt(repairNeedHr,1);
+  $("hBacklog").textContent = (backlogHr>0.05?"+":"")+fmt(backlogHr,1);
+  $("hBacklog").className = "v " + (backlogHr>0.05?"bad":"good");
+  $("balNote").innerHTML = backlogHr>0.05
+    ? `리페어 소화율 ${v.Absorb}%로는 시간당 <b style="color:var(--bad)">약 ${fmt(backlogHr,1)}대</b>씩 재공이 쌓입니다. `+
+      `${fmt(v.Hours,1)}Hr 누적 시 <b>약 ${int(backlogHr*v.Hours)}대</b> 적체 → 본 라인 정체 또는 폐각 증가 위험. `+
+      `<b>소화율을 ${Math.ceil(v.Absorb + backlogHr/repairNeedHr*100)}% 이상으로</b> 올려야 균형.`
+    : `리페어가 발생 불량을 모두 소화하여 <b style="color:var(--good)">재공 적체 없음(균형)</b>. 양품율이 천장(${fmt(ceiling,1)}%)에 도달합니다.`;
+}
+
+ids.forEach(k=> $("s"+k).addEventListener("input", render));
+$("reset").addEventListener("click", ()=>{
+  ids.forEach(k=> $("s"+k).value = DEFAULTS[k]);
+  render();
+});
+render();
+</script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+{
+  "name": "cams-capa-dashboard",
+  "version": "1.0.0",
+  "description": "도장 라인 CAPA·품질수율 분석 대시보드",
+  "private": true,
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
